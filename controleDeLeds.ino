@@ -87,16 +87,6 @@ void loop() {
     printFree();
   }
 
-  if (start) {
-    start = false;
-    primeiraAcao = true;
-    seq = 3;
-    contadorIndicesAleatorios = 0;
-    showSeq3();
-  }
-
-
-
 
   if (iRReceiver.decode(&resultados)) {
     if (resultados.value == 0XFFFFFFFF)
