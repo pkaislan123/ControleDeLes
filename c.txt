@@ -17,3 +17,13 @@ int32_t getWiFiChannel(const char *ssid) {
 
 int32_t channel = getWiFiChannel(WIFI_SSID);
 esp_wifi_set_channel(channel, WIFI_SECOND_CHAN_NONE);
+
+
+
+int32_t channel = getWiFiChannel(WIFI_SSID);
+
+WiFi.printDiag(Serial); // Uncomment to verify channel number before
+esp_wifi_set_promiscuous(true);
+esp_wifi_set_channel(channel, WIFI_SECOND_CHAN_NONE);
+esp_wifi_set_promiscuous(false);
+WiFi.printDiag(Serial); // Uncomment to verify channel change after
