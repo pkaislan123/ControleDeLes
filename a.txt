@@ -35,9 +35,15 @@ void setup() {
   //Ativação da Conexão serial para fins de depuração
   Serial.begin(115200);
 
-  delay(500);
+  delay(3000);
 
  WiFi.mode(WIFI_STA);
+
+  //Inicializa o ESP-NOW
+  if (esp_now_init() != 0) {
+    Serial.println("Erro ao inicializar o ESP-NOW");
+    return;
+  }
 
 
   esp_now_register_send_cb(OnDataSent);  // Registra a função de callback que é chamada quando os dados são enviados
@@ -54,7 +60,7 @@ void setup() {
     Serial.println("Failed to add peer");
     return;
   }
-
+}
 
 
 void loop() {
