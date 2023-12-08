@@ -1,1 +1,76 @@
-t
+#include "WiFi.h"
+#include <esp_now.h>
+
+
+
+uint8_t macAddress3Esp32[] = {0x34, 0x86, 0x5D, 0x49, 0x9D, 0x50};
+//34:86:5D:49:9D:50
+
+esp_now_peer_info_t peerInfo;
+
+
+typedef struct DataStruct
+{
+  char a[60];
+} DataStruct ;
+
+DataStruct  dataEnvioParaSlave;
+
+
+
+void OnDataSent(const uint8_t *mac_addr, esp_now_send_status_t status) {
+
+  Serial.print("Status dos dados enviados: ");
+  if (status == ESP_NOW_SEND_SUCCESS) {
+    Serial.println("Envio ok!");
+  }
+  else {
+    Serial.println("Falha no envio!");
+  }
+}
+
+
+
+void setup() {
+  //Ativação da Conexão serial para fins de depuração
+  Serial.begin(115200);
+
+  delay(500);
+
+ WiFi.mode(WIFI_STA);
+
+
+  esp_now_register_send_cb(OnDataSent);  // Registra a função de callback que é chamada quando os dados são enviados
+ 
+
+
+  // Register peer
+  memcpy(peerInfo.peer_addr, macAddress3Esp32, 6);
+  peerInfo.channel = 0;
+  peerInfo.encrypt = false;
+
+  // Add peer
+  if (esp_now_add_peer(&peerInfo) != ESP_OK) {
+    Serial.println("Failed to add peer");
+    return;
+  }
+
+
+
+void loop() {
+
+  if (Serial.available()) {
+    String leitura = Serial.readString();
+
+
+    leitura = leitura.substring(0, 60);
+    leitura.toCharArray(dataEnvioParaSlave.a, 60);
+    esp_now_send(macAddress3Esp32, (uint8_t *) &dataEnvioParaSlave, sizeof(dataEnvioParaSlave));
+
+  }
+
+}
+
+
+
+
