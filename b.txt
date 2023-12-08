@@ -1,0 +1,182 @@
+#include "WiFi.h"
+#include <esp_now.h>
+
+
+
+//Número de Reles
+const int tam_arrays_relay = 19;
+
+//Configuração da pinagem dos Relés
+int relaysPins[tam_arrays_relay] = {15, 2, 4, 16, 17, 5, 18, 19, 21, 22, 23, 13, 12, 14, 27, 26, 25, 33, 32};
+int relaysState[tam_arrays_relay] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+
+//Mude esse valor para 0 para inverter o valor logico de acionamento do relé
+const int state_on = 1;
+
+
+uint8_t macAddress3Esp32[] = {0x8C, 0xCE, 0x4E, 0xC8, 0xA3, 0x9F};
+//endereço mac do master
+
+
+typedef struct DataStruct
+{
+  char a[60];
+} DataStruct ;
+
+DataStruct  dataEnvioParaSlave;
+DataStruct  dataRecDoSlave;
+
+esp_now_peer_info_t peerInfo;
+
+
+
+
+void OnDataSent(const uint8_t *mac_addr, esp_now_send_status_t status) {
+
+  Serial.print("Status dos dados enviados: ");
+  if (status == ESP_NOW_SEND_SUCCESS) {
+    Serial.println("Envio ok!");
+  }
+  else {
+    Serial.println("Falha no envio!");
+  }
+}
+
+
+void OnDataRecv(const  uint8_t * mac, const  uint8_t *incomingData, int len)
+{
+
+  memcpy(&dataRecDoSlave, incomingData, sizeof(dataRecDoSlave));
+  Serial.println();
+  Serial.print("Bytes recebidos: ");
+  Serial.println(len);
+  Serial.print("String: ");
+  Serial.println(dataRecDoSlave.a);
+  String dado_recebido = dataRecDoSlave.a;
+
+  int arroba = dado_recebido.indexOf("@");
+  int sifrao = dado_recebido.indexOf("$");
+  int e_com = dado_recebido.indexOf("&");
+  int hashtag = dado_recebido.indexOf("#");
+
+  if (arroba >= 0 && sifrao > 0 && e_com > 0 && hashtag > 0 ) {
+
+    Serial.println("Requisicao chegou");
+
+    String tipo = dado_recebido.substring(arroba + 1, sifrao);
+    String indice = dado_recebido.substring(sifrao + 1, e_com);
+    String status_indice = dado_recebido.substring(e_com + 1, hashtag );
+
+    int Itipo = tipo.toInt();
+    int Iindice = indice.toInt();
+    int Istatus_indice = status_indice.toInt();
+
+    Serial.print("Tipo: ");
+    Serial.println(Itipo);
+
+    Serial.print("Indice: ");
+    Serial.println(Iindice);
+
+    Serial.print("Status: ");
+    Serial.println(Istatus_indice);
+
+    if (Itipo == 1) {
+      //ligar/desligar
+
+      relaysState[Iindice - 19] = Istatus_indice;
+
+      digitalWrite(relaysPins[Iindice - 19], relaysState[Iindice - 19]);
+
+
+
+    } else if (Itipo == 2) {
+      //status
+
+      String info_status = "@";
+      for (int i = 0; i < tam_arrays_relay; i++) {
+        int leitura = relaysState[i];
+
+        String i_status = String(leitura);
+        info_status.concat(i_status);
+
+        if (i < tam_arrays_relay - 1) {
+          info_status.concat(";");
+        }
+      }
+      info_status.concat("#");
+
+      Serial.print("Retorno: ");
+      Serial.println(info_status);
+
+
+      info_status = info_status.substring(0, 60);
+      info_status.toCharArray(dataEnvioParaSlave.a, 60);
+
+      esp_now_send(macAddress3Esp32, (uint8_t *) &dataEnvioParaSlave, sizeof(dataEnvioParaSlave));
+
+
+    }
+
+  }
+
+}
+
+void setup()
+{
+  Serial.begin(115200);
+
+
+  delay(500);
+
+  //Configuração inicial dos reles, definição de cada
+  //pino como saida, desativando o pino e definindo um nome inicial ao rele para que não haja lixo no array
+  for (int i = 0; i < tam_arrays_relay ; i++) {
+
+    relaysState[i] = !state_on;
+
+
+    pinMode(relaysPins[i], OUTPUT);
+    digitalWrite(relaysPins[i], relaysState[i]);
+    delay(10);
+  }
+
+  //Coloca o dispositivo no modo Wi-Fi Station
+  WiFi.mode(WIFI_STA);
+  //Inicializa o ESP-NOW
+  if (esp_now_init() != ESP_OK) {
+    Serial.println("Erro ao inicializar o ESP-NOW");
+    return;
+  }
+
+
+  esp_now_register_send_cb(OnDataSent);  // Registra a função de callback que é chamada quando os dados são enviados
+  esp_now_register_recv_cb(OnDataRecv);  // Registra a função de callback que é chamada quando os dados são recebidos
+
+
+
+  // Register peer
+  memcpy(peerInfo.peer_addr, macAddress3Esp32, 6);
+  peerInfo.channel = 0;
+  peerInfo.encrypt = false;
+
+  // Add peer
+  if (esp_now_add_peer(&peerInfo) != ESP_OK) {
+    Serial.println("Failed to add peer");
+    return;
+  }
+
+ 
+}
+
+
+void loop() {
+
+  if (Serial.available()) {
+    String leitura = Serial.readString();
+    leitura = leitura.substring(0, 60);
+    leitura.toCharArray(dataEnvioParaSlave.a, 60);
+    esp_now_send(macAddress3Esp32, (uint8_t *) &dataEnvioParaSlave, sizeof(dataEnvioParaSlave));
+
+  }
+
+}
